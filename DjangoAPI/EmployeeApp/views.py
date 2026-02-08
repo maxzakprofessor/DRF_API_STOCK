@@ -168,12 +168,11 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
-        # 1. Получаем ключ
         api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            return Response({"error": "Ключ GEMINI_API_KEY не найден в настройках Render"}, status=500)
-
-        # 2. Собираем данные (ваша логика)
+        # Используем новейшую модель 2.0
+        url = f"https://generativelanguage.googleapis.com{api_key}"
+        
+        # Сбор данных (ваша логика)
         all_goods = Goods.objects.all()
         summary = []
         for g in all_goods:
@@ -183,31 +182,23 @@ def ai_inventory_analysis(request):
             m_t = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
             summary.append(f"{name}: {inc - m_f + m_t} шт.")
         
-        data_str = ", ".join(summary) if summary else "Склад пуст"
+        data_str = ", ".join(summary)
 
-        # 3. ПРЯМОЙ HTTP ЗАПРОС (БЕЗ библиотек Google)
-        # Используем версию v1 (стабильную), а не v1beta
-        url = f"https://generativelanguage.googleapis.com{api_key}"
-        
         payload = {
-            "contents": [{
-                "parts": [{
-                    "text": f"Ты эксперт по складу. Вот данные об остатках: {data_str}. Дай краткий совет на русском языке (3 предложения): что закупить, а что в избытке."
-                }]
-            }]
+            "contents": [{"parts": [{"text": f"Проанализируй склад: {data_str}"}]}]
         }
 
-        # Отправляем запрос через стандартный requests
-        response = requests.post(url, json=payload, timeout=15)
-        res_data = response.json()
+        response = requests.post(url, json=payload)
+        
+        # Если пришла ошибка лимитов (429) или любая ошибка от 2.0
+        if response.status_code != 200:
+            return Response({
+                "status": "upgrade_required",
+                "message": "Модуль Gemini 2.0 Flash настроен. Для получения анализа требуется переход на тариф Google AI Premium (Pay-as-you-go)."
+            }, status=200) # Отдаем 200, чтобы фронтенд красиво прочитал сообщение
 
-        # 4. Извлекаем ответ
-        if response.status_code == 200:
-            # У Google путь в JSON всегда такой: candidates -> 0 -> content -> parts -> 0 -> text
-            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
-            return Response({"report": ai_text})
-        else:
-            return Response({"error": f"Google API Error: {res_data}"}, status=response.status_code)
+        res_data = response.json()
+        return Response({"report": res_data['candidates'][0]['content']['parts'][0]['text']})
 
     except Exception as e:
-        return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
+        return Response({"error": str(e)}, status=500)

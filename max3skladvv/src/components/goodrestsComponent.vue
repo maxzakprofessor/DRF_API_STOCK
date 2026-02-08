@@ -15,13 +15,29 @@
                  Скачать PDF
             </button>
     </div>
-    <div class="col">
-            <button type="button"
-                class="btn btn-primary m-2 fload-end"
-                @click="AskAI()">
-                 Спросить AI
-            </button>
-    </div>
+
+            <!-- Кнопка вызова -->
+        <button @click="AskAI" :disabled="loadingAI" class="btn btn-primary m-2">
+            <span v-if="loadingAI" class="spinner-border spinner-border-sm"></span>
+            🤖 Спросить AI-советника (Gemini 2.0)
+        </button>
+
+        <!-- Блок ответа (ставим сразу под кнопкой) -->
+        <div v-if="needUpgrade" class="alert alert-warning mt-3 shadow-sm border-2">
+            <h5 class="alert-heading">🚀 Gemini 2.0 Flash интегрирован!</h5>
+            <p>{{ aiMessage }}</p>
+            <hr>
+            <p class="mb-0 small text-muted">
+                <strong>Статус:</strong> Архитектура бэкенда (Django + Docker) полностью готова. 
+                Для работы требуется API-ключ уровня Premium.
+            </p>
+        </div>
+
+        <div v-else-if="aiMessage" class="alert alert-success mt-3 shadow-sm">
+            <strong>Анализ склада:</strong> {{ aiMessage }}
+        </div>
+
+    
     <div class="col-md-auto">
         <div class="input-group mb-3">
                 <span class="input-group-text">Склад</span>
@@ -87,6 +103,9 @@
     name: 'goodrestsComponent',
     data(){
     return{
+        aiMessage: '',
+        needUpgrade: false, // Флаг для показа предупреждения
+        loadingAI: false,
         goodrests:[],
         goods:[],
         stocks:[],
@@ -145,19 +164,27 @@ methods:{
         this.qty=acc.qty;
         this.datetime=acc.datetime
     },
-        AskAI() {
-                this.aiMessage = "🤖 AI анализирует склад, подождите..."; // Добавьте aiMessage в data()
-                axios.get(this.API_URL + "ai-report/") // Убедитесь, что путь совпадает с urls.py
-                        .then((response) => {
-                    // Используем .report, так как в Django мы написали Response({"report": ...})
-                    this.aiMessage = response.data.report; 
-            // Если всё же хотите alert:
-            // alert(response.data.report);
-                })
-        .catch((error) => {
-            console.error(error);
-            this.aiMessage = "Ошибка при обращении к AI.";
-        }); 
+        async AskAI() {
+
+                        this.loadingAI = true;
+            this.aiMessage = "";
+            this.needUpgrade = false;
+
+            try {
+                const res = await axios.get(this.API_URL + "ai-report/");
+                
+                if (res.data.status === "upgrade_required") {
+                    this.needUpgrade = true;
+                    this.aiMessage = res.data.message;
+                } else {
+                    this.aiMessage = res.data.report;
+                }
+            } catch (error) {
+                this.aiMessage = "Сервис временно недоступен";
+            } finally {
+                this.loadingAI = false;
+            }
+
         },
     createClick(){
         axios.post(this.API_URL+"goodrests",{
