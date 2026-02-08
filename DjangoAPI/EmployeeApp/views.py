@@ -174,7 +174,7 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден"}, status=500)
 
-        # 1. Расчет остатков
+        # 1. Расчет остатков (ваша проверенная логика)
         all_goods = Goods.objects.all()
         inventory_summary = []
         for good in all_goods:
@@ -187,35 +187,33 @@ def ai_inventory_analysis(request):
 
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. ПРАВИЛЬНЫЙ ЗАПРОС (Разделяем URL и Ключ)
-        # Мы НЕ пишем ключ в саму строку URL, а передаем его отдельно в params
-        api_url = "https://generativelanguage.googleapis.com"
+        # 2. ПРЯМОЙ ЗАПРОС (Используем v1 стабильную и жесткую склейку)
+        # ВНИМАНИЕ: Мы убираем params и пишем всё в одну строку БЕЗ f-строки для надежности
+        url = "https://generativelanguage.googleapis.com" + str(api_key)
         
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
+                    "text": "Ты эксперт по складу. Проанализируй остатки: " + data_str + ". Дай краткий совет на русском: что закупить, а что в избытке."
                 }]
             }]
         }
 
-        # Передаем ключ через params — так requests сам добавит '?' и '=' правильно
-        response = requests.post(api_url, params={'key': api_key}, json=payload, timeout=10)
+        # 3. Отправка с явным указанием заголовков
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
         
         if response.status_code != 200:
-            return Response({"error": f"Google Error: {response.text}"}, status=response.status_code)
+            return Response({"error": f"Google вернул {response.status_code}: {response.text}"}, status=response.status_code)
 
         res_data = response.json()
         
-        # Безопасно достаем текст
+        # 4. Безопасное извлечение текста
         try:
             ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
             return Response({"report": ai_text})
-        except:
-            return Response({"error": f"Формат ответа AI изменился: {res_data}"}, status=500)
+        except (KeyError, IndexError):
+            return Response({"error": f"Формат JSON изменился: {res_data}"}, status=500)
 
     except Exception as e:
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
-
-
-
