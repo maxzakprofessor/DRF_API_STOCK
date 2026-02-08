@@ -163,14 +163,20 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
+import os
+import requests
+from django.db.models import Sum
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            return Response({"error": "API Key не найден"}, status=500)
+            return Response({"error": "API Key не найден в настройках Render"}, status=500)
 
-        # 1. Собираем данные
+        # 1. Считаем реальные остатки
         all_goods = Goods.objects.all()
         inventory_summary = []
         for good in all_goods:
@@ -183,42 +189,32 @@ def ai_inventory_analysis(request):
 
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. Прямой HTTP запрос (ПОЛНЫЙ ПУТЬ К МОДЕЛИ)
-        url = "https://generativelanguage.googleapis.com"
-        params = {"key": api_key}
+        # 2. ПРЯМОЙ ЗАПРОС К GOOGLE (Исправленный URL v1)
+        url = f"https://generativelanguage.googleapis.com{api_key}"
         
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке. Отвечай кратко."
+                    "text": f"Ты — эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
                 }]
             }]
         }
 
-        # Выполняем запрос
-        response = requests.post(url, params=params, json=payload)
+        # 3. Отправляем запрос
+        response = requests.post(url, json=payload)
         
-        # Проверяем, пришел ли вообще JSON
-        try:
-            res_data = response.json()
-        except Exception:
-            return Response({"error": f"Google вернул не JSON: {response.text[:100]}"}, status=500)
+        # Если Google вернул ошибку (например, ключ не подошел)
+        if response.status_code != 200:
+            return Response({"error": f"Google API Error: {response.text}"}, status=response.status_code)
 
-        # 3. Извлекаем текст (добавлены индексы [0])
-        if response.status_code == 200:
-            try:
-                # В структуре Google это всегда списки: candidates[0], parts[0]
-                ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
-                return Response({"report": ai_text})
-            except (KeyError, IndexError):
-                return Response({"error": f"Неожиданная структура JSON: {res_data}"}, status=500)
-        else:
-            return Response({"error": f"Ошибка Google API: {res_data}"}, status=response.status_code)
+        res_data = response.json()
+
+        # 4. Достаем текст ответа (проверяем структуру)
+        try:
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        except (KeyError, IndexError):
+            return Response({"error": f"Неожиданный формат ответа: {res_data}"}, status=500)
 
     except Exception as e:
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
-
-
-
-    
-
