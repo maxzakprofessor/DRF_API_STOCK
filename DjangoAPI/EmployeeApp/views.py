@@ -170,7 +170,7 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден"}, status=500)
 
-        # 1. Собираем данные
+        # 1. Собираем данные (твоя логика)
         all_goods = Goods.objects.all()
         inventory_summary = []
         for good in all_goods:
@@ -183,8 +183,10 @@ def ai_inventory_analysis(request):
 
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. Прямой HTTP запрос к Google API (минуя библиотеку genai)
-        url = f"https://generativelanguage.googleapis.com{api_key}"
+        # 2. Прямой HTTP запрос (исправленная ссылка)
+        # Обратите внимание на знак '?' и переменную 'key'
+        url = "https://generativelanguage.googleapis.com"
+        params = {"key": api_key}
         
         payload = {
             "contents": [{
@@ -194,11 +196,13 @@ def ai_inventory_analysis(request):
             }]
         }
 
-        response = requests.post(url, json=payload)
+        # Отправляем запрос через params, чтобы ключ не слипался с URL
+        response = requests.post(url, params=params, json=payload)
         res_data = response.json()
 
-        # 3. Извлекаем текст из ответа
+        # 3. Извлекаем текст
         if response.status_code == 200:
+            # У Google сложная структура ответа, достаем текст аккуратно
             ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
             return Response({"report": ai_text})
         else:
@@ -206,7 +210,6 @@ def ai_inventory_analysis(request):
 
     except Exception as e:
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
-
 
 
     
