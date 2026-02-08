@@ -188,12 +188,3 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Настройка WhiteNoise для сжатия файлов
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# В самом низу файла settings.py
-from django.contrib.auth import get_user_model
-try:
-    User = get_user_model()
-    if not User.objects.filter(username='admin').exists():
-        User.objects.create_superuser('admin', 'admin@example.com', 'Max12345')
-        print("Суперпользователь 'admin' успешно создан!")
-except Exception as e:
-    print(f"Ошибка при создании суперпользователя: {e}")
