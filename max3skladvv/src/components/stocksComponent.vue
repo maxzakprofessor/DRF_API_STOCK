@@ -151,7 +151,8 @@ export default {
  //        API_URL:"https://localhost:7141/api/",
  //        API_URL:"http://127.0.0.1:8000/",
  //        API_URL:"https://mzakiryanovgmailcom.pythonanywhere.com/"
- API_URL : import.meta.env.VITE_API_URL || "https://mzakiryanovgmailcom.pythonanywhere.com/",        
+ //API_URL : import.meta.env.VITE_API_URL || "https://mzakiryanovgmailcom.pythonanywhere.com/",
+API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",       
  //API_URL:"https://webapistockkz.azurewebsites.net/api/",
 
     }
