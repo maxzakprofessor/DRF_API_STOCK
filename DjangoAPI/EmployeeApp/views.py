@@ -172,8 +172,8 @@ def ai_inventory_analysis(request):
         # Настройка транспорта для стабильности в Docker
         genai.configure(api_key=api_key, transport='rest')
         
-        # Используем новейшую модель gemini-2.0-flash из вашего списка
-        model = genai.GenerativeModel('models/gemini-2.0-flash')
+        # Используем новейшую модель gemini-1.5-flash из вашего списка
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         # 2. Получаем данные всех товаров для анализа
         all_goods = Goods.objects.all()
