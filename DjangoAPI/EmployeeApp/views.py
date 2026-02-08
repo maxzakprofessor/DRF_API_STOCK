@@ -169,11 +169,11 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден в переменных окружения"}, status=500)
             
-        # transport='rest' помогает обойти проблемы с gRPC в Docker
+        # Настройка транспорта для стабильности в Docker
         genai.configure(api_key=api_key, transport='rest')
         
-        # Пробуем версию 'gemini-1.5-flash-latest' — она часто лучше подхватывается API v1
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Используем новейшую модель gemini-2.0-flash из вашего списка
+        model = genai.GenerativeModel('models/gemini-2.0-flash')
 
         # 2. Получаем данные всех товаров для анализа
         all_goods = Goods.objects.all()
@@ -209,16 +209,10 @@ def ai_inventory_analysis(request):
         return Response({"report": response.text})
         
     except Exception as e:
-        # Если будет 404, этот блок покажет список доступных моделей
-        try:
-            available_models = [m.name for m in genai.list_models()]
-        except:
-            available_models = "Не удалось получить список моделей"
-            
         return Response({
-            "error": f"Ошибка AI: {str(e)}",
-            "available_models": available_models
+            "error": f"Ошибка AI: {str(e)}"
         }, status=500)
+
 
 
     
