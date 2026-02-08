@@ -14,4 +14,6 @@ COPY . .
 # Сборка статики
 RUN python manage.py collectstatic --noinput
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "DjangoAPI.wsgi:application"]
+# Вместо старого CMD вставьте это:
+CMD python manage.py migrate && gunicorn --bind 0.0.0.0:8000 DjangoAPI.wsgi:application
+
