@@ -163,42 +163,52 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 @api_view(['GET'])
 def ai_inventory_analysis(request):
-    # 1. Настройка Gemini
-    api_key = os.environ.get("GEMINI_API_KEY")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
-
-    # 2. Получаем данные всех товаров для анализа
-    all_goods = Goods.objects.all()
-    inventory_summary = []
-
-    for good in all_goods:
-        # Используем nameGood, так как оно прописано в модели Goods
-        current_name = good.nameGood 
-        
-        # Считаем остатки, используя это имя
-        income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-        move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-        move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-        
-        qty_rest = income_sum - move_from_sum + move_to_sum
-        inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
-
-    # 3. Формируем запрос к AI на Google Search
-    data_str = ", ".join(inventory_summary)
-    prompt = f"""
-    Ты — аналитик складских запасов. Проанализируй данные об остатках товаров: {data_str}.
-    Напиши очень краткий отчет (3 предложения):
-    1. Какой товар заканчивается (дефицит).
-    2. Какого товара слишком много (избыток).
-    3. Общий совет по закупкам.
-    Отвечай на русском языке.
-    """
-
     try:
+        # 1. Настройка Gemini
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            return Response({"error": "API Key не найден в переменных окружения"}, status=500)
+            
+        genai.configure(api_key=api_key)
+        
+        # Используем самую стабильную модель для Free Tier
+        model = genai.GenerativeModel('gemini-1.5-flash') 
+
+        # 2. Получаем данные всех товаров для анализа
+        all_goods = Goods.objects.all()
+        inventory_summary = []
+
+        for good in all_goods:
+            current_name = good.nameGood 
+            
+            # Считаем остатки
+            income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
+            move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
+            move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
+            
+            qty_rest = income_sum - move_from_sum + move_to_sum
+            inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
+
+        # Собираем данные в одну строку для AI
+        data_str = ", ".join(inventory_summary)
+
+        # 3. Формируем запрос
+        prompt = f"""
+        Ты — эксперт по складской логистике. Проанализируй данные об остатках товаров: {data_str}.
+        Напиши очень краткий отчет (3 предложения):
+        1. Какой товар в дефиците.
+        2. Какого товара слишком много.
+        3. Общий совет по закупкам.
+        Отвечай на русском языке.
+        """
+        
+        # 4. Вызов AI
         response = model.generate_content(prompt)
+        
         return Response({"report": response.text})
+        
     except Exception as e:
+        # Если будет ошибка, мы увидим её текст в JSON
         return Response({"error": str(e)}, status=500)
 
     
