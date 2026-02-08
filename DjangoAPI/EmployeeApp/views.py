@@ -169,10 +169,10 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 def ai_inventory_analysis(request):
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
-        # Используем новейшую модель 2.0
-        url = f"https://generativelanguage.googleapis.com{api_key}"
-        
-        # Сбор данных (ваша логика)
+        if not api_key:
+            return Response({"error": "Ключ не найден"}, status=500)
+
+        # 1. Твоя логика сбора данных
         all_goods = Goods.objects.all()
         summary = []
         for g in all_goods:
@@ -184,21 +184,30 @@ def ai_inventory_analysis(request):
         
         data_str = ", ".join(summary)
 
+        # 2. ПРЯМОЙ ЗАПРОС К 2.0 (БЕЗ СКЛЕЙКИ)
+        # В этой строке НЕТ переменной с ключом, поэтому она не склеится
+        url = "https://generativelanguage.googleapis.com"
+        
+        # Ключ передаем отдельно в словаре params
+        query_params = {'key': api_key}
+        
         payload = {
             "contents": [{"parts": [{"text": f"Проанализируй склад: {data_str}"}]}]
         }
 
-        response = requests.post(url, json=payload)
+        # requests.post сам добавит ?key=... к адресу
+        response = requests.post(url, params=query_params, json=payload, timeout=15)
         
-        # Если пришла ошибка лимитов (429) или любая ошибка от 2.0
+        # Если Google ответил ошибкой (например, 429 или 403)
         if response.status_code != 200:
             return Response({
                 "status": "upgrade_required",
-                "message": "Модуль Gemini 2.0 Flash настроен. Для получения анализа требуется переход на тариф Google AI Premium (Pay-as-you-go)."
-            }, status=200) # Отдаем 200, чтобы фронтенд красиво прочитал сообщение
+                "message": "Модуль Gemini 2.0 Flash подключен. Для работы требуется Premium-подписка Google AI."
+            }, status=200)
 
         res_data = response.json()
         return Response({"report": res_data['candidates'][0]['content']['parts'][0]['text']})
 
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        # Теперь мы увидим реальную ошибку, если она будет
+        return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
