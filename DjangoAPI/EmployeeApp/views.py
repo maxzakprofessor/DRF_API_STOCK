@@ -166,7 +166,7 @@ def ai_inventory_analysis(request):
     # 1. Настройка Gemini
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
 
     # 2. Получаем данные всех товаров для анализа
     all_goods = Goods.objects.all()
