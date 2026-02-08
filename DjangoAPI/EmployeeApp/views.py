@@ -172,7 +172,7 @@ def ai_inventory_analysis(request):
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            return Response({"error": "API Key не найден в настройках"}, status=500)
+            return Response({"error": "API Key не найден"}, status=500)
 
         # 1. Расчет остатков
         all_goods = Goods.objects.all()
@@ -187,14 +187,9 @@ def ai_inventory_analysis(request):
 
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. ПРЯМОЙ ЗАПРОС (Ключ в заголовке x-goog-api-key)
-        # Чистый URL без переменных — он ТОЧНО не склеится с ключом
-        url = "https://generativelanguage.googleapis.com"
-        
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key  # Ключ передается отдельно от URL
-        }
+        # 2. ПРЯМОЙ ЗАПРОС (Используем params для автоматической сборки URL)
+        # Это гарантирует, что между адресом и ключом БУДЕТ знак вопроса и НЕ БУДЕТ склейки
+        api_url = "https://generativelanguage.googleapis.com"
         
         payload = {
             "contents": [{
@@ -204,8 +199,13 @@ def ai_inventory_analysis(request):
             }]
         }
 
-        # Отправляем запрос
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        # requests.post сам добавит к ссылке ?key=ваш_ключ
+        response = requests.post(
+            api_url, 
+            params={'key': api_key}, 
+            json=payload, 
+            timeout=15
+        )
         
         if response.status_code != 200:
             return Response({"error": f"Google вернул {response.status_code}: {response.text}"}, status=response.status_code)
@@ -214,6 +214,7 @@ def ai_inventory_analysis(request):
         
         # Безопасное извлечение текста
         try:
+            # У Google путь: candidates -> content -> parts -> text
             ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
             return Response({"report": ai_text})
         except (KeyError, IndexError):
