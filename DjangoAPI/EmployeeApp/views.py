@@ -171,48 +171,57 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
+        # 1. Получаем API ключ из настроек Render
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            return Response({"error": "API Key не найден"}, status=500)
+            return Response({"error": "API Key не найден в переменных окружения Render"}, status=500)
 
-        # 1. Расчет остатков (твоя логика)
+        # 2. Собираем данные об остатках (ваша логика)
         all_goods = Goods.objects.all()
         inventory_summary = []
+
         for good in all_goods:
             current_name = good.nameGood 
+            
+            # Считаем остатки по вашей формуле
             income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
             move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
             move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
+            
             qty_rest = income_sum - move_from_sum + move_to_sum
             inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
 
+        # Превращаем список в строку для нейросети
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. ПРЯМОЙ ЗАПРОС (Ультра-точный URL)
-        # Важно: v1 (не beta), модель 1.5-flash и двоеточие перед generateContent
-        url = f"https://generativelanguage.googleapis.com"
-        
-        headers = {'Content-Type': 'application/json'}
-        params = {'key': api_key}
+        # 3. Прямой HTTP запрос к Google (самый надежный способ)
+        # Формируем URL так, чтобы ничего не слиплось
+        url = f"https://generativelanguage.googleapis.com{api_key}"
         
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты — эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
+                    "text": f"Ты — эксперт по складской логистике. Проанализируй текущие остатки товаров: {data_str}. Напиши краткий отчет на русском языке: что в дефиците, что в избытке и общий совет по закупкам (3-4 предложения)."
                 }]
             }]
         }
 
-        # 3. Отправка
-        response = requests.post(url, params=params, json=payload, headers=headers)
+        # Отправляем запрос
+        response = requests.post(url, json=payload)
         
+        # Если Google ответил не 200, выводим ошибку
         if response.status_code != 200:
-            return Response({"error": f"Google Error {response.status_code}: {response.text}"}, status=response.status_code)
+            return Response({"error": f"Google API Error {response.status_code}: {response.text}"}, status=response.status_code)
 
         res_data = response.json()
-        ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
-        
-        return Response({"report": ai_text})
+
+        # 4. Извлекаем текст из сложной структуры ответа Google
+        try:
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        except (KeyError, IndexError):
+            return Response({"error": f"Неожиданный формат JSON от Google: {res_data}"}, status=500)
 
     except Exception as e:
+        # Общая системная ошибка (если что-то пошло не так в коде)
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
