@@ -145,21 +145,20 @@ methods:{
         this.qty=acc.qty;
         this.datetime=acc.datetime
     },
-    AskAI() {
-    this.aiMessage = "🤖 AI анализирует склад, подождите..."; // Добавьте aiMessage в data()
-    axios.get(this.API_URL + "ai-report/") // Убедитесь, что путь совпадает с urls.py
-        .then((response) => {
-            // Используем .report, так как в Django мы написали Response({"report": ...})
-            this.aiMessage = response.data.report; 
+        AskAI() {
+                this.aiMessage = "🤖 AI анализирует склад, подождите..."; // Добавьте aiMessage в data()
+                axios.get(this.API_URL + "ai-report/") // Убедитесь, что путь совпадает с urls.py
+                        .then((response) => {
+                    // Используем .report, так как в Django мы написали Response({"report": ...})
+                    this.aiMessage = response.data.report; 
             // Если всё же хотите alert:
             // alert(response.data.report);
-        })
+                })
         .catch((error) => {
             console.error(error);
             this.aiMessage = "Ошибка при обращении к AI.";
-        });
-    }
-    },
+        }); 
+        },
     createClick(){
         axios.post(this.API_URL+"goodrests",{
             id_stock:this.id_stock,
