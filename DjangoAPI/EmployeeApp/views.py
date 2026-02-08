@@ -169,9 +169,10 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден в переменных окружения"}, status=500)
             
-        genai.configure(api_key=api_key)
+        # transport='rest' решает проблему с 404/v1beta
+        genai.configure(api_key=api_key, transport='rest')
         
-        # Используем самую стабильную модель для Free Tier
+        # Используем модель flash (самая быстрая для анализа)
         model = genai.GenerativeModel('gemini-1.5-flash')
 
         # 2. Получаем данные всех товаров для анализа
@@ -181,7 +182,7 @@ def ai_inventory_analysis(request):
         for good in all_goods:
             current_name = good.nameGood 
             
-            # Считаем остатки
+            # Считаем остатки (ваша логика)
             income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
             move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
             move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
@@ -190,7 +191,7 @@ def ai_inventory_analysis(request):
             inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
 
         # Собираем данные в одну строку для AI
-        data_str = ", ".join(inventory_summary)
+        data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
         # 3. Формируем запрос
         prompt = f"""
@@ -208,8 +209,9 @@ def ai_inventory_analysis(request):
         return Response({"report": response.text})
         
     except Exception as e:
-        # Если будет ошибка, мы увидим её текст в JSON
-        return Response({"error": str(e)}, status=500)
+        # Если снова будет ошибка, мы увидим подробности
+        return Response({"error": f"Ошибка AI: {str(e)}"}, status=500)
+
 
     
 
