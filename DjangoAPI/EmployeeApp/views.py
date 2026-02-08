@@ -15,7 +15,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import google.generativeai as genai
 import os
-
+import requests # Добавьте этот импорт в начало файла!
 
 # Create your views here.
 
@@ -161,58 +161,51 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
+
+
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
-        # 1. Настройка Gemini
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            return Response({"error": "API Key не найден в переменных окружения"}, status=500)
-            
-        # Настройка транспорта rest принудительно
-        genai.configure(api_key=api_key, transport='rest')
-        
-        # Используем ПОЛНОЕ системное имя модели из вашего списка
-        # Это исключит ошибку 404 (not found для v1beta)
-        model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+            return Response({"error": "API Key не найден"}, status=500)
 
-        # 2. Получаем данные всех товаров для анализа
+        # 1. Собираем данные
         all_goods = Goods.objects.all()
         inventory_summary = []
-
         for good in all_goods:
             current_name = good.nameGood 
-            
-            # Считаем остатки (ваша логика)
             income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
             move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
             move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-            
             qty_rest = income_sum - move_from_sum + move_to_sum
             inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
 
-        # Собираем данные в одну строку для AI
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 3. Формируем запрос
-        prompt = f"""
-        Ты — эксперт по складской логистике. Проанализируй данные об остатках товаров: {data_str}.
-        Напиши очень краткий отчет (3 предложения):
-        1. Какой товар в дефиците.
-        2. Какого товара слишком много.
-        3. Общий совет по закупкам.
-        Отвечай на русском языке.
-        """
+        # 2. Прямой HTTP запрос к Google API (минуя библиотеку genai)
+        url = f"https://generativelanguage.googleapis.com{api_key}"
         
-        # 4. Вызов AI
-        response = model.generate_content(prompt)
-        
-        return Response({"report": response.text})
-        
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"Ты эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
+                }]
+            }]
+        }
+
+        response = requests.post(url, json=payload)
+        res_data = response.json()
+
+        # 3. Извлекаем текст из ответа
+        if response.status_code == 200:
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        else:
+            return Response({"error": f"Ошибка Google API: {res_data}"}, status=response.status_code)
+
     except Exception as e:
-        return Response({
-            "error": f"Ошибка AI: {str(e)}"
-        }, status=500)
+        return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
 
 
 
