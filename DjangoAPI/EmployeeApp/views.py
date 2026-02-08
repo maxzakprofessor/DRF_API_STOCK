@@ -16,11 +16,7 @@ from rest_framework.response import Response
 import google.generativeai as genai
 import os
 import requests # Добавьте этот импорт в начало файла!
-import os
-import requests
-from django.db.models import Sum
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+
 
 # Create your views here.
 
@@ -167,14 +163,17 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
+
+
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
+        # 1. Получаем ключ
         api_key = os.environ.get("GEMINI_API_KEY")
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        if not api_key:
+            return Response({"error": "Ключ GEMINI_API_KEY не найден в настройках Render"}, status=500)
 
-        # Data collection (your verified loop)
+        # 2. Собираем данные (ваша логика)
         all_goods = Goods.objects.all()
         summary = []
         for g in all_goods:
@@ -183,12 +182,32 @@ def ai_inventory_analysis(request):
             m_f = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
             m_t = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
             summary.append(f"{name}: {inc - m_f + m_t} шт.")
-
+        
         data_str = ", ".join(summary) if summary else "Склад пуст"
 
-        # AI request
-        response = model.generate_content(f"Ты эксперт. Проанализируй склад: {data_str}. Дай совет на русском.")
-        return Response({"report": response.text})
+        # 3. ПРЯМОЙ HTTP ЗАПРОС (БЕЗ библиотек Google)
+        # Используем версию v1 (стабильную), а не v1beta
+        url = f"https://generativelanguage.googleapis.com{api_key}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"Ты эксперт по складу. Вот данные об остатках: {data_str}. Дай краткий совет на русском языке (3 предложения): что закупить, а что в избытке."
+                }]
+            }]
+        }
+
+        # Отправляем запрос через стандартный requests
+        response = requests.post(url, json=payload, timeout=15)
+        res_data = response.json()
+
+        # 4. Извлекаем ответ
+        if response.status_code == 200:
+            # У Google путь в JSON всегда такой: candidates -> 0 -> content -> parts -> 0 -> text
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        else:
+            return Response({"error": f"Google API Error: {res_data}"}, status=response.status_code)
 
     except Exception as e:
-        return Response({"error": f"Ошибка: {str(e)}"}, status=500)
+        return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
