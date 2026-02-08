@@ -174,55 +174,48 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден"}, status=500)
 
-        # 1. Собираем данные об остатках
+        # 1. Расчет остатков
         all_goods = Goods.objects.all()
         inventory_summary = []
         for good in all_goods:
-            current_name = good.nameGood 
-            income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-            move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-            move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
-            qty_rest = income_sum - move_from_sum + move_to_sum
-            inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
+            name = good.nameGood 
+            income = Goodincomes.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            m_from = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            m_to = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            qty_rest = income - m_from + m_to
+            inventory_summary.append(f"{name}: {qty_rest} шт.")    
 
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. ПРЯМОЙ ЗАПРОС К GOOGLE (Версия V1 - самая стабильная)
-        # ВАЖНО: Весь URL в одну строку, чтобы избежать ошибок сборки пути
-        url = f"https://generativelanguage.googleapis.com{api_key}"
+        # 2. ПРАВИЛЬНЫЙ ЗАПРОС (Разделяем URL и Ключ)
+        # Мы НЕ пишем ключ в саму строку URL, а передаем его отдельно в params
+        api_url = "https://generativelanguage.googleapis.com"
         
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты — эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке. Будь краток (2-3 предложения)."
+                    "text": f"Ты эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
                 }]
             }]
         }
 
-        # 3. Отправляем запрос
-        # Добавим таймаут, чтобы сервер не висел вечно
-        response = requests.post(url, json=payload, timeout=10)
+        # Передаем ключ через params — так requests сам добавит '?' и '=' правильно
+        response = requests.post(api_url, params={'key': api_key}, json=payload, timeout=10)
         
         if response.status_code != 200:
-            return Response({"error": f"Google Error {response.status_code}: {response.text}"}, status=response.status_code)
+            return Response({"error": f"Google Error: {response.text}"}, status=response.status_code)
 
         res_data = response.json()
-
-        # 4. Извлекаем текст (используем безопасный метод .get)
+        
+        # Безопасно достаем текст
         try:
-            candidates = res_data.get('candidates', [])
-            if candidates:
-                parts = candidates[0].get('content', {}).get('parts', [])
-                if parts:
-                    ai_text = parts[0].get('text', 'AI вернул пустой ответ')
-                    return Response({"report": ai_text})
-            
-            return Response({"error": f"Не удалось найти текст в ответе: {res_data}"}, status=500)
-            
-        except Exception as parse_error:
-            return Response({"error": f"Ошибка парсинга JSON: {str(parse_error)}"}, status=500)
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        except:
+            return Response({"error": f"Формат ответа AI изменился: {res_data}"}, status=500)
 
     except Exception as e:
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
+
 
 
