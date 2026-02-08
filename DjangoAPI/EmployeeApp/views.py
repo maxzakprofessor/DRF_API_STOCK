@@ -172,7 +172,7 @@ def ai_inventory_analysis(request):
         genai.configure(api_key=api_key)
         
         # Используем самую стабильную модель для Free Tier
-        model = genai.GenerativeModel('gemini-1.5-flash') 
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         # 2. Получаем данные всех товаров для анализа
         all_goods = Goods.objects.all()
