@@ -15,6 +15,13 @@
                  Скачать PDF
             </button>
     </div>
+    <div class="col">
+            <button type="button"
+                class="btn btn-primary m-2 fload-end"
+                @click="AskAI()">
+                 Спросить AI
+            </button>
+    </div>
     <div class="col-md-auto">
         <div class="input-group mb-3">
                 <span class="input-group-text">Склад</span>
@@ -137,6 +144,21 @@ methods:{
         this.nameGood=acc.nameGood;
         this.qty=acc.qty;
         this.datetime=acc.datetime
+    },
+    AskAI() {
+    this.aiMessage = "🤖 AI анализирует склад, подождите..."; // Добавьте aiMessage в data()
+    axios.get(this.API_URL + "ai-report/") // Убедитесь, что путь совпадает с urls.py
+        .then((response) => {
+            // Используем .report, так как в Django мы написали Response({"report": ...})
+            this.aiMessage = response.data.report; 
+            // Если всё же хотите alert:
+            // alert(response.data.report);
+        })
+        .catch((error) => {
+            console.error(error);
+            this.aiMessage = "Ошибка при обращении к AI.";
+        });
+    }
     },
     createClick(){
         axios.post(this.API_URL+"goodrests",{

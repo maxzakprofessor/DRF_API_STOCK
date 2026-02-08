@@ -11,6 +11,12 @@ from django.core.files.storage import default_storage
 from django.db.models import Sum, OuterRef, Subquery, FloatField
 from django.db.models.functions import Coalesce
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+import google.generativeai as genai
+import os
+
+
 # Create your views here.
 
 @csrf_exempt
@@ -153,6 +159,44 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
             "qty": qty_rest
         }], safe=False)
 
+
+
+@api_view(['GET'])
+def ai_inventory_analysis(request):
+    # 1. Настройка Gemini
+    api_key = os.environ.get("GEMINI_API_KEY")
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    # 2. Получаем данные всех товаров для анализа
+    all_goods = Goods.objects.all() # Получаем список имен всех товаров
+    inventory_summary = []
+
+    for good in all_goods:
+        # Твоя логика расчета остатка (упрощенно для всех складов)
+        income_sum = Goodincomes.objects.filter(nameGood=good.GoodsName).aggregate(s=Sum('qty'))['s'] or 0
+        move_from_sum = Goodmoves.objects.filter(nameGood=good.GoodsName).aggregate(s=Sum('qty'))['s'] or 0
+        move_to_sum = Goodmoves.objects.filter(nameGood=good.GoodsName).aggregate(s=Sum('qty'))['s'] or 0
+        
+        qty_rest = income_sum - move_from_sum + move_to_sum
+        inventory_summary.append(f"{good.GoodsName}: {qty_rest} шт.")
+
+    # 3. Формируем запрос к AI на Google Search
+    data_str = ", ".join(inventory_summary)
+    prompt = f"""
+    Ты — аналитик складских запасов. Проанализируй данные об остатках товаров: {data_str}.
+    Напиши очень краткий отчет (3 предложения):
+    1. Какой товар заканчивается (дефицит).
+    2. Какого товара слишком много (избыток).
+    3. Общий совет по закупкам.
+    Отвечай на русском языке.
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        return Response({"report": response.text})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
     
 

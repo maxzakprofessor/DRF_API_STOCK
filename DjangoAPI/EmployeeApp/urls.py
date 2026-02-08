@@ -21,6 +21,7 @@ urlpatterns=[
      # Важно: str позволяет принимать кириллицу "Все"
     # Обязательно добавьте слэши в конце, если браузер их присылает
     path('goodrests/<str:wnameStock>/<str:wnameGood>/', views.goodrestApi),
+    path('ai-analysis/', views.ai_inventory_analysis),
 
     re_path(r'^goodincomes$', views.goodincomeApi),
     re_path(r'^goodincomes/([0-9]+)$', views.goodincomeApi)
