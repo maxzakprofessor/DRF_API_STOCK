@@ -171,54 +171,24 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 def ai_inventory_analysis(request):
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            return Response({"error": "API Key не найден"}, status=500)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
-        # 1. Расчет остатков
+        # Data collection (your verified loop)
         all_goods = Goods.objects.all()
-        inventory_summary = []
-        for good in all_goods:
-            name = good.nameGood 
-            income = Goodincomes.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
-            m_from = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
-            m_to = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
-            qty_rest = income - m_from + m_to
-            inventory_summary.append(f"{name}: {qty_rest} шт.")    
+        summary = []
+        for g in all_goods:
+            name = g.nameGood
+            inc = Goodincomes.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            m_f = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            m_t = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            summary.append(f"{name}: {inc - m_f + m_t} шт.")
 
-        data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
+        data_str = ", ".join(summary) if summary else "Склад пуст"
 
-        # 2. ПРЯМОЙ ЗАПРОС (Используем params для автоматической сборки URL)
-        # Это гарантирует, что между адресом и ключом БУДЕТ знак вопроса и НЕ БУДЕТ склейки
-        api_url = "https://generativelanguage.googleapis.com"
-        
-        payload = {
-            "contents": [{
-                "parts": [{
-                    "text": f"Ты эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
-                }]
-            }]
-        }
-
-        # requests.post сам добавит к ссылке ?key=ваш_ключ
-        response = requests.post(
-            api_url, 
-            params={'key': api_key}, 
-            json=payload, 
-            timeout=15
-        )
-        
-        if response.status_code != 200:
-            return Response({"error": f"Google вернул {response.status_code}: {response.text}"}, status=response.status_code)
-
-        res_data = response.json()
-        
-        # Безопасное извлечение текста
-        try:
-            # У Google путь: candidates -> content -> parts -> text
-            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
-            return Response({"report": ai_text})
-        except (KeyError, IndexError):
-            return Response({"error": f"Формат ответа AI: {res_data}"}, status=500)
+        # AI request
+        response = model.generate_content(f"Ты эксперт. Проанализируй склад: {data_str}. Дай совет на русском.")
+        return Response({"report": response.text})
 
     except Exception as e:
-        return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
+        return Response({"error": f"Ошибка: {str(e)}"}, status=500)
