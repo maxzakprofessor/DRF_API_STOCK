@@ -167,7 +167,6 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
-
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
@@ -175,7 +174,7 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден"}, status=500)
 
-        # 1. Считаем остатки
+        # 1. Собираем данные об остатках
         all_goods = Goods.objects.all()
         inventory_summary = []
         for good in all_goods:
@@ -188,35 +187,42 @@ def ai_inventory_analysis(request):
 
         data_str = ", ".join(inventory_summary) if inventory_summary else "Склад пуст"
 
-        # 2. ПРЯМОЙ ЗАПРОС К GOOGLE (Исправленная ссылка)
-        # ВНИМАНИЕ: Знак ? после generateContent обязателен!
-        base_url = "https://generativelanguage.googleapis.com"
-        full_url = f"{base_url}?key={api_key}"
+        # 2. ПРЯМОЙ ЗАПРОС К GOOGLE (Версия V1 - самая стабильная)
+        # ВАЖНО: Весь URL в одну строку, чтобы избежать ошибок сборки пути
+        url = f"https://generativelanguage.googleapis.com{api_key}"
         
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты — эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке."
+                    "text": f"Ты — эксперт по складу. Проанализируй остатки: {data_str}. Дай краткий совет на русском: что закупить, а что в избытке. Будь краток (2-3 предложения)."
                 }]
             }]
         }
 
         # 3. Отправляем запрос
-        response = requests.post(full_url, json=payload)
+        # Добавим таймаут, чтобы сервер не висел вечно
+        response = requests.post(url, json=payload, timeout=10)
         
-        # Если Google ответил ошибкой
         if response.status_code != 200:
-            return Response({"error": f"Google API Error {response.status_code}: {response.text}"}, status=response.status_code)
+            return Response({"error": f"Google Error {response.status_code}: {response.text}"}, status=response.status_code)
 
         res_data = response.json()
 
-        # 4. Извлекаем текст
+        # 4. Извлекаем текст (используем безопасный метод .get)
         try:
-            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
-            return Response({"report": ai_text})
-        except (KeyError, IndexError):
-            return Response({"error": f"Неожиданный формат ответа: {res_data}"}, status=500)
+            candidates = res_data.get('candidates', [])
+            if candidates:
+                parts = candidates[0].get('content', {}).get('parts', [])
+                if parts:
+                    ai_text = parts[0].get('text', 'AI вернул пустой ответ')
+                    return Response({"report": ai_text})
+            
+            return Response({"error": f"Не удалось найти текст в ответе: {res_data}"}, status=500)
+            
+        except Exception as parse_error:
+            return Response({"error": f"Ошибка парсинга JSON: {str(parse_error)}"}, status=500)
 
     except Exception as e:
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
+
 
