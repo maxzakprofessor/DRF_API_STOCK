@@ -182,3 +182,8 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Эта строка критически важна для Docker и WhiteNoise
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Настройка WhiteNoise для сжатия файлов
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
