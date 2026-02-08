@@ -169,17 +169,20 @@ def ai_inventory_analysis(request):
     model = genai.GenerativeModel('gemini-1.5-flash')
 
     # 2. Получаем данные всех товаров для анализа
-    all_goods = Goods.objects.all() # Получаем список имен всех товаров
+    all_goods = Goods.objects.all()
     inventory_summary = []
 
     for good in all_goods:
-        # Твоя логика расчета остатка (упрощенно для всех складов)
-        income_sum = Goodincomes.objects.filter(nameGood=good.GoodsName).aggregate(s=Sum('qty'))['s'] or 0
-        move_from_sum = Goodmoves.objects.filter(nameGood=good.GoodsName).aggregate(s=Sum('qty'))['s'] or 0
-        move_to_sum = Goodmoves.objects.filter(nameGood=good.GoodsName).aggregate(s=Sum('qty'))['s'] or 0
+        # Используем nameGood, так как оно прописано в модели Goods
+        current_name = good.nameGood 
+        
+        # Считаем остатки, используя это имя
+        income_sum = Goodincomes.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
+        move_from_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
+        move_to_sum = Goodmoves.objects.filter(nameGood=current_name).aggregate(s=Sum('qty'))['s'] or 0
         
         qty_rest = income_sum - move_from_sum + move_to_sum
-        inventory_summary.append(f"{good.GoodsName}: {qty_rest} шт.")
+        inventory_summary.append(f"{current_name}: {qty_rest} шт.")    
 
     # 3. Формируем запрос к AI на Google Search
     data_str = ", ".join(inventory_summary)
