@@ -169,11 +169,12 @@ def ai_inventory_analysis(request):
         if not api_key:
             return Response({"error": "API Key не найден в переменных окружения"}, status=500)
             
-        # Настройка транспорта для стабильности в Docker
+        # Настройка транспорта rest принудительно
         genai.configure(api_key=api_key, transport='rest')
         
-        # Используем новейшую модель gemini-1.5-flash из вашего списка
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Используем ПОЛНОЕ системное имя модели из вашего списка
+        # Это исключит ошибку 404 (not found для v1beta)
+        model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
 
         # 2. Получаем данные всех товаров для анализа
         all_goods = Goods.objects.all()
