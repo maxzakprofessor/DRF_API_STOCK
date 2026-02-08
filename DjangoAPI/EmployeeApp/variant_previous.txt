@@ -1,0 +1,116 @@
+def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
+    if request.method == 'GET':
+        # Если пришли параметры "Все", выполняем расчет
+        if wnameStock == "Все" and wnameGood == "Все":
+            result = []
+            goods = Goods.objects.all()
+            stocks = Stocks.objects.all()
+            
+            for g in goods:
+                for s in stocks:
+                    # Считаем суммы (как в .NET версии)
+                    income = Goodincomes.objects.filter(nameGood=g.nameGood, nameStock=s.nameStock).aggregate(s=Sum('qty'))['s'] or 0
+                    move_from = Goodmoves.objects.filter(nameGood=g.nameGood, nameStockFrom=s.nameStock).aggregate(s=Sum('qty'))['s'] or 0
+                    move_to = Goodmoves.objects.filter(nameGood=g.nameGood, nameStockTowhere=s.nameStock).aggregate(s=Sum('qty'))['s'] or 0
+                    
+                    qty_sum = income - move_from + move_to
+                    
+                    # Формируем объект ответа
+                    result.append({
+                        "nameGood": g.nameGood,
+                        "nameStock": s.nameStock,
+                        "qty": qty_sum
+                    })
+            return JsonResponse(result, safe=False)
+        
+        # Если логика "Все" не сработала, возвращаем просто список из БД
+        goodrests = Goodrests.objects.all()
+        serializer = GoodrestSerializer(goodrests, many=True)
+        return JsonResponse(serializer.data, safe=False)
+-----
+Как это работает:
+Если (Все, Все): Фильтры не применяются, и вы получаете общую сумму по всем товарам и всем складам в базе.
+Если (Склад 1, Все): Код отфильтрует приходы и перемещения только по "Складу 1". Вы увидите общий остаток всех товаров на этом конкретном складе.
+Если (Все, Яблоки): Вы увидите, сколько всего "Яблок" осталось во всей компании (на всех складах вместе).
+Если (Склад 1, Яблоки): Вы получите точный остаток конкретного товара на конкретном складе.
+Нюанс для Vue (Таблица):
+Если вы хотите, чтобы при выборе "Все" по складам, API выдавал не одну строку с общей суммой, а список всех товаров с их остатками (как мы делали раньше), нужно оставить логику с annotate для случая "Все".
+Хотите, чтобы я объединил эти два подхода в одну "умную" функцию (если "Все" — выдавать список, если конкретный — одну цифру)?
+
+
+from django.db.models import Sum, Q
+from django.http import JsonResponse
+
+@csrf_exempt
+def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
+    if request.method == 'GET':
+        # Базовые фильтры для всех таблиц
+        income_qs = Goodincome.objects.all()
+        move_from_qs = Goodmove.objects.all()
+        move_to_qs = Goodmove.objects.all()
+
+        # 1. Фильтруем по ТОВАРУ (если выбрано не "Все")
+        if wnameGood != "Все":
+            income_qs = income_qs.filter(nameGood=wnameGood)
+            move_from_qs = move_from_qs.filter(nameGood=wnameGood)
+            move_to_qs = move_to_qs.filter(nameGood=wnameGood)
+
+        # 2. Фильтруем по СКЛАДУ (если выбрано не "Все")
+        if wnameStock != "Все":
+            income_qs = income_qs.filter(nameStock=wnameStock)
+            move_from_qs = move_from_qs.filter(nameStockFrom=wnameStock)
+            move_to_qs = move_to_qs.filter(nameStockTowhere=wnameStock)
+
+        # 3. Считаем итоговые суммы
+        income_sum = income_qs.aggregate(s=Sum('qty'))['s'] or 0
+        move_from_sum = move_from_qs.aggregate(s=Sum('qty'))['s'] or 0
+        move_to_sum = move_to_qs.aggregate(s=Sum('qty'))['s'] or 0
+
+        qty_rest = income_sum - move_from_sum + move_to_sum
+
+        # Возвращаем результат
+        return JsonResponse([{
+            "nameGood": wnameGood,
+            "nameStock": wnameStock,
+            "qty": qty_rest
+        }], safe=False)
+
+-----
+Variant 2
+def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
+    if request.method == 'GET':
+        if wnameStock == "Все" and wnameGood == "Все":
+            # Подзапросы для суммирования по конкретному товару
+            income_sub = Goodincomes.objects.filter(
+                nameGood=OuterRef('nameGood')
+            ).values('nameGood').annotate(total=Sum('qty')).values('total')
+
+            move_from_sub = Goodmoves.objects.filter(
+                nameGood=OuterRef('nameGood')
+            ).values('nameGood').annotate(total=Sum('qty')).values('total')
+
+            move_to_sub = Goodmoves.objects.filter(
+                nameGood=OuterRef('nameGood')
+            ).values('nameGood').annotate(total=Sum('qty')).values('total')
+
+            # Один запрос к БД со всей математикой
+            goods_with_rests = Goods.objects.annotate(
+                t_income=Coalesce(Subquery(income_sub), 0.0, output_field=FloatField()),
+                t_from=Coalesce(Subquery(move_from_sub), 0.0, output_field=FloatField()),
+                t_to=Coalesce(Subquery(move_to_sub), 0.0, output_field=FloatField()),
+            )
+
+            result = [
+                {
+                    "nameGood": g.nameGood,
+                    "nameStock": "Все",
+                    "qty": g.t_income - g.t_from + g.t_to
+                }
+                for g in goods_with_rests
+            ]
+            return JsonResponse(result, safe=False)
+
+        # Стандартный возврат, если параметры не "Все"
+        goodrests = Goodrests.objects.all()
+        serializer = GoodrestSerializer(goodrests, many=True)
+        return JsonResponse(serializer.data, safe=False)
