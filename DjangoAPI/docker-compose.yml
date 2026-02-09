@@ -1,15 +1,17 @@
 services:
-  # База данных PostgreSQL
+  # 1. База данных PostgreSQL (Хранит цифры и товары)
   db:
     image: postgres:15
+    container_name: djangoapi_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+    restart: always
 
-  # Векторная база данных для ИИ
+  # 2. Векторная база данных (Хранит "мозги" и знания ИИ)
   chromadb:
     image: chromadb/chroma:latest
     container_name: chromadb
@@ -17,15 +19,23 @@ services:
       - "8001:8000"
     volumes:
       - ./chroma_data:/chroma/data
+    restart: always
 
-  # Ваше Django приложение
+  # 3. Ваше Django приложение (Back-end)
   web:
-    build: .  # ТОЧКА, так как Dockerfile находится в этой же папке
-    command: python manage.py migrate && python manage.py runserver 0.0.0.0:8000
+    build: .
+    # ИСПРАВЛЕНО: Добавлен sh -c для последовательного запуска команд
+    command: >
+      sh -c "python manage.py migrate && 
+             python manage.py collectstatic --noinput && 
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
+    # ИСПРАВЛЕНО: Добавлена переменная связи с БД
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres
     env_file:
       - .env
     depends_on:
