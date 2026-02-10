@@ -255,7 +255,7 @@ methods:{
         })
     },
     GetReport(){
-        axios.get(ENDPOINTS.GOODRESTS+this.nameStock+"/"+this.nameGood)
+        axios.get(ENDPOINTS.GOODRESTS+"/"+this.nameStock+"/"+this.nameGood)
         .then((response)=>{
             this.goodrests=response.data;
             console.log(response.data);
