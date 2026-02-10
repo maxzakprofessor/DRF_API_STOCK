@@ -19,6 +19,11 @@ import requests # Добавьте этот импорт в начало фай�
 from .ai_engine import SkladAI  # Наш мозг для работы с ChromaDB
 
 
+
+
+
+
+
 # Create your views here.
 
 @csrf_exempt
@@ -163,23 +168,23 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
-import os
-import requests
-from django.db.models import Sum
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from .models import Goods, Goodincomes, Goodmoves
-from .ai_engine import SkladAI 
+
 
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
-        # Берем ключ из .env (на сервере он должен быть прописан)
+        # 1. Берем ключ из .env (Безопасность)
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             return Response({"report": "### 🔴 Ошибка\nКлюч API не найден в системе (.env)"})
 
-        # 1. Сбор данных из базы
+        # 2. Собираем URL из ваших частей (Гибкая архитектура)
+        base_url = "https://generativelanguage.googleapis.com"
+        model_path = "models/gemini-1.5-flash"
+        action = ":generateContent"
+        full_url = f"{base_url}{model_path}{action}"
+
+        # 3. Сбор данных из PostgreSQL
         all_goods = Goods.objects.all()
         summary = []
         for g in all_goods:
@@ -188,41 +193,37 @@ def ai_inventory_analysis(request):
             summary.append(f"- {g.nameGood}: {inc - out} шт.")
         data_str = "\n".join(summary) if summary else "Склад пуст"
 
-        # 2. Получаем инструкции из ChromaDB (RAG)
+        # 4. RAG: Получаем контекст из ChromaDB
         context = "Инструкции не найдены."
         try:
             ai = SkladAI()
             relevant_docs = ai.collection.query(query_texts=[data_str], n_results=1)
-            if relevant_docs['documents'] and len(relevant_docs['documents'][0]) > 0:
-                context = relevant_docs['documents'][0][0]
+            if relevant_docs['documents'] and len(relevant_docs['documents']) > 0:
+                context = " ".join(relevant_docs['documents'][0])
         except Exception as e:
             print(f"ChromaDB Error: {e}")
 
-        # 3. ПОЛНЫЙ ПРАВИЛЬНЫЙ URL (как мы проверили в curl)
-        url = "https://generativelanguage.googleapis.com"
-        
-        # Передаем ключ как параметр
-        query_params = {'key': api_key}
-        
+        # 5. Формируем полезную нагрузку (Payload)
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты ИИ-аналитик. Инструкции: {context}. Данные склада:\n{data_str}\nДай краткий совет на русском в формате Markdown."
+                    "text": f"Ты ИИ-аналитик склада. Инструкции: {context}. Данные склада:\n{data_str}\nДай краткий профессиональный совет на русском в формате Markdown."
                 }]
             }]
         }
 
-        # 4. Отправка запроса
-        response = requests.post(url, params=query_params, json=payload, timeout=15)
+        # 6. Отправка запроса с использованием ваших частей URL
+        response = requests.post(full_url, params={'key': api_key}, json=payload, timeout=15)
         
         if response.status_code == 200:
             res_data = response.json()
+            # Безопасное извлечение текста от ИИ
             ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
             return Response({"report": ai_text})
         else:
-            # Если Google ответил ошибкой (например, 403 - нужен VPN)
+            # Обработка ошибок (например, если нужен VPN/WARP)
             return Response({
-                "report": f"### 🔴 Ошибка API (Код {response.status_code})\nGoogle отклонил запрос. Проверьте регион ключа или включите VPN/WARP на сервере."
+                "report": f"### 🔴 Ошибка API (Код {response.status_code})\n{response.text}"
             })
 
     except Exception as e:
