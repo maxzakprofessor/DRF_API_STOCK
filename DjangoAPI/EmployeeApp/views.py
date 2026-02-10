@@ -185,6 +185,7 @@ def ai_inventory_analysis(request):
 
         # 3. Запрос к Gemini 2.0 Flash
         url = "https://generativelanguage.googleapis.com"
+  
         payload = {
             "contents": [{
                 "parts": [{
