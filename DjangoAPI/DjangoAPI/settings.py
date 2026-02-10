@@ -42,12 +42,12 @@ DEBUG = True
 #ALLOWED_HOSTS = ['*']  # Это разрешит любые IP, включая ваш 192.168.160.137
 
 
-#CORS_ALLOWED_ORIGINS = [
-#    "https://drf-api-stock-vuu.vercel.app",  # Ваш точный адрес фронтенда
-#    "http://localhost:5173",                 # Локальный Vue (Vite)
-#    "http://127.0.0.1:5173",                # Локальный Vue (IP)
-#    "http://localhost:8080",                 # Локальный Vue (старый порт)
-#]
+CORS_ALLOWED_ORIGINS = [
+    "https://drf-api-stock-vuu.vercel.app",  # Ваш точный адрес фронтенда
+    "http://localhost:5173",                 # Локальный Vue (Vite)
+    "http://127.0.0.1:5173",                # Локальный Vue (IP)
+    "http://localhost:8080",                 # Локальный Vue (старый порт)
+]
 
 CORS_ALLOW_ALL_ORIGINS = True 
 CORS_ALLOW_METHODS = [
