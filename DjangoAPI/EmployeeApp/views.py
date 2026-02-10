@@ -163,53 +163,67 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
+import os
+import requests
+from django.db.models import Sum
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import Goods, Goodincomes, Goodmoves
+from .ai_engine import SkladAI 
+
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
+        # Берем ключ из .env (на сервере он должен быть прописан)
         api_key = os.environ.get("GEMINI_API_KEY")
-        
-        # 1. Сбор данных из PostgreSQL
+        if not api_key:
+            return Response({"report": "### 🔴 Ошибка\nКлюч API не найден в системе (.env)"})
+
+        # 1. Сбор данных из базы
         all_goods = Goods.objects.all()
-        summary = [f"- {g.nameGood}: {(Goodincomes.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0) - (Goodmoves.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0)} шт." for g in all_goods]
+        summary = []
+        for g in all_goods:
+            inc = Goodincomes.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0
+            out = Goodmoves.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0
+            summary.append(f"- {g.nameGood}: {inc - out} шт.")
         data_str = "\n".join(summary) if summary else "Склад пуст"
 
-        # 2. RAG: Поиск контекста в ChromaDB
+        # 2. Получаем инструкции из ChromaDB (RAG)
         context = "Инструкции не найдены."
         try:
             ai = SkladAI()
             relevant_docs = ai.collection.query(query_texts=[data_str], n_results=1)
-            if relevant_docs['documents'] and len(relevant_docs['documents']) > 0:
-                context = " ".join(relevant_docs['documents'][0])
+            if relevant_docs['documents'] and len(relevant_docs['documents'][0]) > 0:
+                context = relevant_docs['documents'][0][0]
         except Exception as e:
             print(f"ChromaDB Error: {e}")
 
-        # 3. Запрос к Gemini 2.0 Flash
+        # 3. ПОЛНЫЙ ПРАВИЛЬНЫЙ URL (как мы проверили в curl)
         url = "https://generativelanguage.googleapis.com"
-  
+        
+        # Передаем ключ как параметр
+        query_params = {'key': api_key}
+        
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты ИИ-аналитик. Используй инструкции: {context}. Данные склада:\n{data_str}\nДай ответ в формате Markdown (используй заголовки, списки и жирный шрифт) на русском языке."
+                    "text": f"Ты ИИ-аналитик. Инструкции: {context}. Данные склада:\n{data_str}\nДай краткий совет на русском в формате Markdown."
                 }]
             }]
         }
-        
-        response = requests.post(url, params={'key': api_key}, json=payload, timeout=15)
-        
-        # ПРОВЕРКА: Если Google прислал не JSON, а ошибку (например, HTML 403)
-        if response.status_code != 200:
-            return Response({
-                "report": f"### 🔴 Ошибка API (Код {response.status_code})\nGoogle отклонил запрос. Возможно, ключ не активен или требуется прокси-сервер."
-            })
 
-        res_data = response.json()
+        # 4. Отправка запроса
+        response = requests.post(url, params=query_params, json=payload, timeout=15)
         
-        # Безопасное извлечение текста
-        try:
+        if response.status_code == 200:
+            res_data = response.json()
             ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
             return Response({"report": ai_text})
-        except (KeyError, IndexError):
-            return Response({"report": "### ⚠️ Ошибка\nНе удалось обработать структуру ответа от ИИ."})
+        else:
+            # Если Google ответил ошибкой (например, 403 - нужен VPN)
+            return Response({
+                "report": f"### 🔴 Ошибка API (Код {response.status_code})\nGoogle отклонил запрос. Проверьте регион ключа или включите VPN/WARP на сервере."
+            })
 
     except Exception as e:
         return Response({"report": f"### ⚠️ Системная ошибка\nДетали: {str(e)}"})
