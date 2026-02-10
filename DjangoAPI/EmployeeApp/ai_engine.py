@@ -1,4 +1,4 @@
-import chromadb
+"""import chromadb
 from sentence_transformers import SentenceTransformer
 
 class SkladAI:
@@ -16,5 +16,5 @@ class SkladAI:
         # Возвращаем найденный документ (инструкцию)
         if results['documents'] and len(results['documents']) > 0:
             return results['documents'][0][0] 
-        return "Инструкции не найдены."
+        return "Инструкции не найдены."""
 
