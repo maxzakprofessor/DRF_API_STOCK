@@ -133,6 +133,7 @@ data-bs-target="#exampleModal"
 </template>   
 
 <script>
+  import { API_URL, ENDPOINTS } from '../config';
 import axios from "axios";
 
 export default {
@@ -152,7 +153,7 @@ export default {
  //        API_URL:"http://127.0.0.1:8000/",
  //        API_URL:"https://mzakiryanovgmailcom.pythonanywhere.com/"
  //API_URL : import.meta.env.VITE_API_URL || "https://mzakiryanovgmailcom.pythonanywhere.com/",
-API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",   
+//API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",   
 //API_URL :import.meta.env.VITE_API_URL || "https://unpackaged-pentamerous-kristyn.ngrok-free.dev/",    
  //API_URL:"https://webapistockkz.azurewebsites.net/api/",
 
@@ -160,7 +161,7 @@ API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender
 },
 methods:{
     refreshData(){
-        axios.get(this.API_URL+"stocks")
+        axios.get(ENDPOINTS.STOCKS)
         .then((response)=>{
             this.stocks=response.data;
             this.stocksWithoutFilter=response.data;
@@ -180,7 +181,7 @@ methods:{
 
     },
     createClick(){
-        axios.post(this.API_URL+"stocks",{
+        axios.post(ENDPOINTS.STOCKS,{
             nameStock:this.nameStock,
         })
         .then((response)=>{
@@ -190,7 +191,7 @@ methods:{
     },
     updateClick(){
         
-        axios.put(this.API_URL+"stocks",{
+        axios.put(ENDPOINTS.STOCKS,{
             id:this.id,
             nameStock:this.nameStock,
         })
@@ -204,7 +205,7 @@ methods:{
             return;
         }
 
-        axios.delete(this.API_URL+"stocks/"+id)
+        axios.delete(ENDPOINTS.STOCKS+id)
         .then((response)=>{
             this.refreshData();
             //alert(response.data);

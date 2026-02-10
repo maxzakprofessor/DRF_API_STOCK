@@ -91,6 +91,7 @@
 </template>
 
 <script>
+  //import { API_URL, ENDPOINTS } from '../config';
   import axios from "axios";
   //import { usePDF } from 'vue3-pdfmake';
 
@@ -98,6 +99,7 @@
   //import pdfMake from "vue3-pdfmake";
   import pdfMake from 'pdfmake/build/pdfmake.js';
   import pdfFonts from 'pdfmake/build/vfs_fonts.js';
+import { ENDPOINTS } from "../config";
   //pdfMake.vfs = pdfFonts.pdfMake.vfs;  
   export default {
     name: 'goodrestsComponent',
@@ -117,7 +119,7 @@
 //        API_URL:"http://127.0.0.1:8000/",
 //        API_URL:"https://mzakiryanovgmailcom.pythonanywhere.com/",
 //API_URL : import.meta.env.VITE_API_URL || "https://mzakiryanovgmailcom.pythonanywhere.com/",
-API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",
+//API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",
 //API_URL :import.meta.env.VITE_API_URL || "https://unpackaged-pentamerous-kristyn.ngrok-free.dev/",
         which_report:"/All",
         nameGood:"",
@@ -132,12 +134,12 @@ methods:{
 //        .then((response)=>{
 //            this.goodrests=response.data;
 //        });
-        axios.get(this.API_URL+"stocks")
+        axios.get(ENDPOINTS.STOCKS)
         .then((response)=>{
             this.stocks=response.data;
             this.nameStock="Все";
         });
-        axios.get(this.API_URL+"goods")
+        axios.get(ENDPOINTS.GOODS)
         .then((response)=>{
             this.goods=response.data;
             this.nameGood="Все";            
@@ -172,7 +174,7 @@ methods:{
             this.needUpgrade = false;
 
             try {
-                const res = await axios.get(this.API_URL + "ai-report/");
+                const res = await axios.get(ENDPOINTS.AI_REPORT);
                 
                 if (res.data.status === "upgrade_required") {
                     this.needUpgrade = true;
@@ -188,7 +190,7 @@ methods:{
 
         },
     createClick(){
-        axios.post(this.API_URL+"goodrests",{
+        axios.post(ENDPOINTS.GOODRESTS,{
             id_stock:this.id_stock,
             nameStock:this.nameStock,
             id_good:this.id_good,
@@ -202,7 +204,7 @@ methods:{
         });
     },
     updateClick(){
-        axios.put(this.API_URL+"goodrests",{
+        axios.put(ENDPOINTS.GOODRESTS,{
             id_stock:this.id_stock,
             nameStock:this.nameStock,
             id_good:this.id_good,
@@ -221,7 +223,7 @@ methods:{
             return;
         }
 
-        axios.delete(this.API_URL+"goodrests/"+id)
+        axios.delete(ENDPOINTS.GOODRESTS+id)
         .then((response)=>{
             this.refreshData();
             //alert(response.data);
@@ -253,7 +255,7 @@ methods:{
         })
     },
     GetReport(){
-        axios.get(this.API_URL+"goodrests/"+this.nameStock+"/"+this.nameGood)
+        axios.get(ENDPOINTS.GOODRESTS+this.nameStock+"/"+this.nameGood)
         .then((response)=>{
             this.goodrests=response.data;
             console.log(response.data);

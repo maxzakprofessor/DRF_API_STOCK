@@ -136,6 +136,8 @@
   
   
   <script>
+
+  import { API_URL, ENDPOINTS } from '../config';
   import axios from "axios";
   
   export default {
@@ -153,15 +155,16 @@
 //       API_URL:"http://127.0.0.1:8000/",
 //        API_URL:"https://mzakiryanovgmailcom.pythonanywhere.com/",
 //API_URL : import.meta.env.VITE_API_URL || "https://mzakiryanovgmailcom.pythonanywhere.com/",
-API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",
+//API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",
 //API_URL :import.meta.env.VITE_API_URL || "https://unpackaged-pentamerous-kristyn.ngrok-free.dev/",
+//API_URL :import.meta.env.VITE_API_URL || "http://192.168.160.137:8000/",
 //        API_URL:"https://webapistockkz.azurewebsites.net/api/",
       }
   },
   methods:{
       refreshData(){
-        console.log("Отправка запроса на:", this.API_URL+"goods"); // <--- Проверка пути
-          axios.get(this.API_URL+"goods")
+        console.log("Отправка запроса на:", ENDPOINTS.GOODS); // <--- Проверка пути
+          axios.get(ENDPOINTS.GOODS)
           .then((response)=>{
               this.goods=response.data;
               this.goodsWithoutFilter=response.data;
@@ -182,7 +185,7 @@ API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender
   
       },
       createClick(){
-          axios.post(this.API_URL+"goods",{
+          axios.post(ENDPOINTS.GOODS,{
               nameGood:this.nameGood,
           })
           .then((response)=>{
@@ -191,7 +194,7 @@ API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender
           });
       },
       updateClick(){
-          axios.put(this.API_URL+"goods",{
+          axios.put(ENDPOINTS.GOODS,{
               id:this.id,
               nameGood:this.nameGood,
           })
@@ -205,7 +208,7 @@ API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender
               return;
           }
   
-          axios.delete(this.API_URL+"goods/"+id)
+          axios.delete(ENDPOINTS.GOODS+id)
           .then((response)=>{
               this.refreshData();
               //(response.data);

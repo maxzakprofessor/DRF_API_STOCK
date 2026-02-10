@@ -32,12 +32,15 @@ SECRET_KEY = 'django-insecure-@oxx-o(4f=mxha%-tlv97)x9m7x_fw=(@*k=*29q%r7c8*)%-&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    'mzakiryanovgmailcom.pythonanywhere.com', # Оставляем старый
-    '.onrender.com',                          # Разрешаем все поддомены Render
-    'localhost', 
-    '127.0.0.1'
-]
+#ALLOWED_HOSTS = [
+#    'mzakiryanovgmailcom.pythonanywhere.com', # Оставляем старый
+#    '.onrender.com',                          # Разрешаем все поддомены Render
+#    'localhost', 
+#    '127.0.0.1'
+#]
+
+ALLOWED_HOSTS = ['*']  # Это разрешит любые IP, включая ваш 192.168.160.137
+
 
 CORS_ALLOWED_ORIGINS = [
     "https://drf-api-stock-vuu.vercel.app",  # Ваш точный адрес фронтенда

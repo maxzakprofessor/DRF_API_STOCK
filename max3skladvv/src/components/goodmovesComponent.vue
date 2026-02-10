@@ -134,6 +134,7 @@ data-bs-target="#exampleModal"
 </template>
 
 <script>
+  import { API_URL, ENDPOINTS } from '../config';
   import axios from "axios";
   
   export default {
@@ -154,7 +155,7 @@ data-bs-target="#exampleModal"
 //        API_URL:"http://127.0.0.1:8000/",
 //        API_URL:"https://mzakiryanovgmailcom.pythonanywhere.com/",
 //API_URL : import.meta.env.VITE_API_URL || "https://mzakiryanovgmailcom.pythonanywhere.com/",
-API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",
+//API_URL : import.meta.env.VITE_API_URL || "https://sklad-backend-docker.onrender.com/",
 //API_URL :import.meta.env.VITE_API_URL || "https://unpackaged-pentamerous-kristyn.ngrok-free.dev/",
 //        API_URL:"https://webapistockkz.azurewebsites.net/api/",
         dateInp:"",
@@ -165,15 +166,15 @@ methods:{
 
 
     refreshData(){
-        axios.get(this.API_URL+"goodmoves")
+        axios.get(ENDPOINTS.GOODMOVES)
         .then((response)=>{
             this.goodmoves=response.data;
         });
-        axios.get(this.API_URL+"stocks")
+        axios.get(ENDPOINTS.STOCKS)
         .then((response)=>{
             this.stocks=response.data;
         });
-        axios.get(this.API_URL+"goods")
+        axios.get(ENDPOINTS.GOODS)
         .then((response)=>{
             this.goods=response.data;
         });        
@@ -213,7 +214,7 @@ methods:{
     },
     createClick(){
         this.datetime=this.dateInp+'T'+this.timeInp+'Z';
-        axios.post(this.API_URL+"goodmoves",{
+        axios.post(ENDPOINTS.GOODMOVES,{
             nameStockFrom:this.nameStockFrom,
             nameStockTowhere:this.nameStockTowhere,
             nameGood:this.nameGood,
@@ -227,7 +228,7 @@ methods:{
     },
     updateClick(){
         this.datetime=this.dateInp+'T'+this.timeInp+'Z';
-        axios.put(this.API_URL+"goodmoves",{
+        axios.put(ENDPOINTS.GOODMOVES,{
             nameStockFrom:this.nameStockFrom,
             nameStockTowhere:this.nameStockTowhere,
             nameGood:this.nameGood,
@@ -245,7 +246,7 @@ methods:{
             return;
         }
 
-        axios.delete(this.API_URL+"goodmoves/"+id)
+        axios.delete(ENDPOINTS.GOODMOVES+id)
         .then((response)=>{
             this.refreshData();
  //           alert(response.data);
