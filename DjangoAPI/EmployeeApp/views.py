@@ -179,8 +179,8 @@ def ai_inventory_analysis(request):
             return Response({"report": "### 🔴 Ошибка\nКлюч API не найден в системе (.env)"})
 
         # 2. Собираем URL из ваших частей (Гибкая архитектура)
-        base_url = "https://generativelanguage.googleapis.com/v1beta2"
-        model_path = "models/gemini-1.5-flash"
+        base_url = "https://generativelanguage.googleapis.com/v1beta"
+        model_path = "/models/gemini-1.5-flash"
         action = ":generateContent"
         full_url = f"{base_url}{model_path}{action}"
 
