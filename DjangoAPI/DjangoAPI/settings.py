@@ -77,10 +77,10 @@ CORS_ORIGIN_ALLOW_ALL = True
 ]"""
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', # ДОЛЖЕН БЫТЬ ПЕРВЫМ
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # <-- ДОБАВИТЬ ЭТУ СТРОКУ (для статики в Docker)
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',        # <-- ОСТАВИТЬ (для связи с Vue)
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
