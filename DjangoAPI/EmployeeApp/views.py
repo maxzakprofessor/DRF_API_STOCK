@@ -170,43 +170,45 @@ def ai_inventory_analysis(request):
         
         # 1. Сбор данных из PostgreSQL
         all_goods = Goods.objects.all()
-        summary = [f"{g.nameGood}: {(Goodincomes.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0) - (Goodmoves.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0)} шт." for g in all_goods]
-        data_str = ", ".join(summary) if summary else "Склад пуст"
+        summary = [f"- {g.nameGood}: {(Goodincomes.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0) - (Goodmoves.objects.filter(nameGood=g.nameGood).aggregate(s=Sum('qty'))['s'] or 0)} шт." for g in all_goods]
+        data_str = "\n".join(summary) if summary else "Склад пуст"
 
         # 2. RAG: Поиск контекста в ChromaDB
         context = "Инструкции не найдены."
         try:
             ai = SkladAI()
             relevant_docs = ai.collection.query(query_texts=[data_str], n_results=1)
-            if relevant_docs['documents'][0]:
+            if relevant_docs['documents'] and len(relevant_docs['documents']) > 0:
                 context = " ".join(relevant_docs['documents'][0])
         except Exception as e:
             print(f"ChromaDB Error: {e}")
 
-        # 3. Прямой запрос к Gemini 2.0 Flash
+        # 3. Запрос к Gemini 2.0 Flash
         url = "https://generativelanguage.googleapis.com"
         payload = {
             "contents": [{
                 "parts": [{
-                    "text": f"Ты ИИ-аналитик склада. Инструкции: {context}. Данные склада: {data_str}. Дай краткий совет на русском."
+                    "text": f"Ты ИИ-аналитик. Используй инструкции: {context}. Данные склада:\n{data_str}\nДай ответ в формате Markdown (используй заголовки, списки и жирный шрифт) на русском языке."
                 }]
             }]
         }
         
-        # Отправляем запрос
         response = requests.post(url, params={'key': api_key}, json=payload, timeout=15)
-        res_data = response.json()
-
-        # Если Google вернул ошибку - мы выводим её как есть, чтобы исправить
+        
+        # ПРОВЕРКА: Если Google прислал не JSON, а ошибку (например, HTML 403)
         if response.status_code != 200:
-            error_msg = res_data.get('error', {}).get('message', 'Неизвестная ошибка API')
             return Response({
-                "report": f"🔴 Ошибка Google API (Код {response.status_code}): {error_msg}. Проверьте ключ в .env!"
+                "report": f"### 🔴 Ошибка API (Код {response.status_code})\nGoogle отклонил запрос. Возможно, ключ не активен или требуется прокси-сервер."
             })
 
-        # Если всё ОК - выводим чистый ответ ИИ
-        ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
-        return Response({"report": ai_text})
+        res_data = response.json()
+        
+        # Безопасное извлечение текста
+        try:
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        except (KeyError, IndexError):
+            return Response({"report": "### ⚠️ Ошибка\nНе удалось обработать структуру ответа от ИИ."})
 
     except Exception as e:
-        return Response({"report": f"⚠️ Системная ошибка: {str(e)}"})
+        return Response({"report": f"### ⚠️ Системная ошибка\nДетали: {str(e)}"})
