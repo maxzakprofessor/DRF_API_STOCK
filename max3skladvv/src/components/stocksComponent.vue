@@ -205,7 +205,7 @@ methods:{
             return;
         }
 
-        axios.delete(ENDPOINTS.STOCKS+id)
+        axios.delete(ENDPOINTS.STOCKS+"/"id)
         .then((response)=>{
             this.refreshData();
             //alert(response.data);

@@ -208,7 +208,7 @@
               return;
           }
   
-          axios.delete(ENDPOINTS.GOODS+id)
+          axios.delete(ENDPOINTS.GOODS+"/"+id)
           .then((response)=>{
               this.refreshData();
               //(response.data);

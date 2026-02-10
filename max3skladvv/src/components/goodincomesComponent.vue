@@ -247,7 +247,7 @@ methods:{
             return;
         }
 
-        axios.delete(ENDPOINTS.GOODINCOMES+id)
+        axios.delete(ENDPOINTS.GOODINCOMES+"/"+id)
         .then((response)=>{
             this.refreshData();
 //            alert(response.data);

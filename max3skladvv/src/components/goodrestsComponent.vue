@@ -223,7 +223,7 @@ methods:{
             return;
         }
 
-        axios.delete(ENDPOINTS.GOODRESTS+id)
+        axios.delete(ENDPOINTS.GOODRESTS+"/"+id)
         .then((response)=>{
             this.refreshData();
             //alert(response.data);

@@ -246,7 +246,7 @@ methods:{
             return;
         }
 
-        axios.delete(ENDPOINTS.GOODMOVES+id)
+        axios.delete(ENDPOINTS.GOODMOVES+"/"+ id)
         .then((response)=>{
             this.refreshData();
  //           alert(response.data);
