@@ -1,4 +1,4 @@
-import os
+"""import os
 import chromadb
 from sentence_transformers import SentenceTransformer
 
@@ -45,4 +45,4 @@ def run_load():
     print(f"🎉 Успех! В базу загружено {len(knowledge)} инструкций.")
 
 if __name__ == "__main__":
-    run_load()
+    run_load()"""
