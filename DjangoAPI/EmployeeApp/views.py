@@ -16,7 +16,7 @@ from rest_framework.response import Response
 import google.generativeai as genai
 import os
 import requests # Добавьте этот импорт в начало файла!
-from .ai_engine import SkladAI  # Наш мозг для работы с ChromaDB
+#from .ai_engine import SkladAI  # Наш мозг для работы с ChromaDB
 
 
 
@@ -170,7 +170,7 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
-@api_view(['GET'])
+"""@api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
         # 1. Берем ключ из .env (Безопасность)
@@ -230,3 +230,4 @@ def ai_inventory_analysis(request):
 
     except Exception as e:
         return Response({"report": f"### ⚠️ Системная ошибка\nДетали: {str(e)}"})
+        """
