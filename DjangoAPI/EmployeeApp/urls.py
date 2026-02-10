@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 
 urlpatterns=[
-    path('ai-report/', views.ai_inventory_analysis), # Самым первым!
+    #path('ai-report/', views.ai_inventory_analysis), # Самым первым!
     re_path(r'^goods$', views.goodApi),
     re_path(r'^goods/([0-9]+)$', views.goodApi),
 
