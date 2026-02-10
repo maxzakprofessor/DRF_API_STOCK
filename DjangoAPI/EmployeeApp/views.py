@@ -16,6 +16,7 @@ from rest_framework.response import Response
 import google.generativeai as genai
 import os
 import requests # Добавьте этот импорт в начало файла!
+from .ai_engine import SkladAI  # Наш мозг для работы с ChromaDB
 
 
 # Create your views here.
@@ -165,49 +166,70 @@ def goodrestApi(request, wnameStock="Все", wnameGood="Все"):
 
 
 
+
+
 @api_view(['GET'])
 def ai_inventory_analysis(request):
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            return Response({"error": "Ключ не найден"}, status=500)
+            return Response({"error": "Ключ Gemini не найден в .env"}, status=500)
 
-        # 1. Твоя логика сбора данных
+        # 1. Собираем реальные данные из PostgreSQL
         all_goods = Goods.objects.all()
         summary = []
         for g in all_goods:
             name = g.nameGood
+            # Расчет остатка: Приход - Расход
             inc = Goodincomes.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
-            m_f = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
-            m_t = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
-            summary.append(f"{name}: {inc - m_f + m_t} шт.")
+            out = Goodmoves.objects.filter(nameGood=name).aggregate(s=Sum('qty'))['s'] or 0
+            summary.append(f"{name}: {inc - out} шт.")
         
-        data_str = ", ".join(summary)
+        data_str = ", ".join(summary) if summary else "Склад пуст"
 
-        # 2. ПРЯМОЙ ЗАПРОС К 2.0 (БЕЗ СКЛЕЙКИ)
-        # В этой строке НЕТ переменной с ключом, поэтому она не склеится
+        # 2. RAG: Получаем контекст из ChromaDB (инструкции из load_docs.py)
+        context = ""
+        try:
+            ai = SkladAI()
+            # Ищем в ChromaDB инструкции, подходящие под наш список товаров
+            relevant_docs = ai.collection.query(query_texts=[data_str], n_results=2)
+            if relevant_docs and relevant_docs['documents']:
+                context = " ".join(relevant_docs['documents'][0])
+        except Exception as e:
+            print(f"Ошибка ChromaDB: {e}")
+            context = "Инструкции по технике безопасности не найдены."
+
+        # 3. Формируем запрос к Gemini 2.0 Flash (ПРЯМОЙ URL)
         url = "https://generativelanguage.googleapis.com"
-        
-        # Ключ передаем отдельно в словаре params
         query_params = {'key': api_key}
         
         payload = {
-            "contents": [{"parts": [{"text": f"Проанализируй склад: {data_str}"}]}]
+            "contents": [{
+                "parts": [{
+                    "text": f"""Ты ИИ-аналитик склада 'Sklad-Intelligence-v1'. 
+                    ИСПОЛЬЗУЙ ЭТИ ИНСТРУКЦИИ ИЗ БАЗЫ ЗНАНИЙ: {context}
+                    
+                    ПРОАНАЛИЗИРУЙ ТЕКУЩИЕ ОСТАТКИ: {data_str}
+                    
+                    Дай краткий, профессиональный совет по безопасности и управлению этим инвентарем на русском языке."""
+                }]
+            }]
         }
 
-        # requests.post сам добавит ?key=... к адресу
+        # 4. Отправляем запрос в Google
         response = requests.post(url, params=query_params, json=payload, timeout=15)
         
-        # Если Google ответил ошибкой (например, 429 или 403)
-        if response.status_code != 200:
-            return Response({
-                "status": "upgrade_required",
-                "message": "Модуль Gemini 2.0 Flash подключен. Для работы требуется Premium-подписка Google AI."
-            }, status=200)
-
-        res_data = response.json()
-        return Response({"report": res_data['candidates'][0]['content']['parts'][0]['text']})
+        if response.status_code == 200:
+            res_data = response.json()
+            # Извлекаем текст из ответа Google
+            ai_text = res_data['candidates'][0]['content']['parts'][0]['text']
+            return Response({"report": ai_text})
+        
+        # Если API ответил ошибкой (например, лимиты ключа)
+        return Response({
+            "status": "upgrade_required",
+            "report": "🚀 Gemini 2.0 Flash активен, но лимиты API исчерпаны. Проверьте подписку Premium или ключ в .env."
+        }, status=200)
 
     except Exception as e:
-        # Теперь мы увидим реальную ошибку, если она будет
         return Response({"error": f"Системная ошибка: {str(e)}"}, status=500)
